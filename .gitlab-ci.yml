@@ -9,7 +9,7 @@ test:fmt:
   stage: test
   script:
     - OUTPUT=$(gofmt -d -s .)
-    - if [ -n "${OUTPUT}" ] then echo "${OUTPUT}"; exit 1; fi
+    - if [ -n "${OUTPUT}" ]; then echo "${OUTPUT}"; exit 1; fi
 
 test:vet:
   extends: .golang
