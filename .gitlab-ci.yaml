@@ -1,0 +1,21 @@
+stage:
+  - tests
+
+.golang:
+  image: golang:1.16
+
+test:fmt:
+  extends: .golang
+  script:
+    - OUTPUT=$(gofmt -d -s .)
+    - if [ -n "${OUTPUT}" ] then echo "${OUTPUT}"; exit 1; fi
+
+test:vet:
+  extends: .golang
+  script:
+    - go vet ./...
+
+test:unit:
+  extends: .golang
+  script:
+    - go test ./...
