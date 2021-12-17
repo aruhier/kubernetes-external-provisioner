@@ -144,7 +144,7 @@ func NewProvisioningController(p Provisioner) (*ProvisionController, error) {
 		return nil, fmt.Errorf("unable to start manager: %s", err)
 	}
 
-	finalizer := fmt.Sprintf("external-provisioner/%s/finalizer", p.Name())
+	finalizer := fmt.Sprintf("%s/finalizer", p.Name())
 
 	if err := registerPersistentVolumeReconciler(mgr, p, finalizer); err != nil {
 		return nil, fmt.Errorf("unable to create PersistentVolume controller: %s", err)
