@@ -114,8 +114,16 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	if r.shouldDelete(log, pv) {
-		return r.delete(ctx, pv)
+	if !pv.ObjectMeta.DeletionTimestamp.IsZero() {
+		if r.shouldDelete(log, pv) {
+			return r.delete(ctx, pv)
+		}
+
+		if err := r.removeFinalizer(ctx, pv); err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
 	log.V(loglevel.Debug).Info("Nothing to do")
@@ -123,10 +131,6 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *persistentVolumeReconciler) shouldDelete(log logr.Logger, pv *v1.PersistentVolume) bool {
-	if pv.ObjectMeta.DeletionTimestamp.IsZero() {
-		return false
-	}
-
 	if !controllerutil.ContainsFinalizer(pv, r.finalizer) {
 		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Finalizer `%s` is not set", r.finalizer))
 		return false
@@ -154,13 +158,21 @@ func (r *persistentVolumeReconciler) delete(ctx context.Context, pv *v1.Persiste
 		return ctrl.Result{Requeue: true}, e
 	}
 
+	if err := r.removeFinalizer(ctx, pv); err != nil {
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *persistentVolumeReconciler) removeFinalizer(ctx context.Context, pv *v1.PersistentVolume) error {
 	controllerutil.RemoveFinalizer(pv, r.finalizer)
 
 	if err := r.Update(ctx, pv); err != nil {
 		e := fmt.Errorf("Unable to update PersistentVolume: %s", err)
 		r.recorder.Event(pv, v1.EventTypeWarning, "DeletionFailed", e.Error())
-		return ctrl.Result{Requeue: true}, e
+		return e
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
