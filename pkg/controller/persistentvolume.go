@@ -62,12 +62,20 @@ func registerPersistentVolumeReconciler(mgr ctrl.Manager, provisioner Provisione
 
 func (r *persistentVolumeReconciler) filterPersistentVolume() predicate.Predicate {
 	filter := func(pv *v1.PersistentVolume) bool {
+		log := r.log.WithValues("persistentvolume", pv.Name)
+
 		provisionedBy, found := pv.Annotations["pv.kubernetes.io/provisioned-by"]
 		if !found {
+			log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Couldn’t find `pv.kubernetes.io/provisioned-by` annotation")
 			return false
 		}
 
-		return provisionedBy == r.provisioner.Name()
+		if provisionedBy != r.provisioner.Name() {
+			log.V(loglevel.Debug).Info("Skipping reconciliation", "reason", "Provisionner name doesn’t match")
+			return false
+		}
+
+		return true
 	}
 
 	return predicate.Funcs{
@@ -106,7 +114,7 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	if r.shouldDelete(pv) {
+	if r.shouldDelete(log, pv) {
 		return r.delete(ctx, pv)
 	}
 
@@ -114,20 +122,23 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Minute}, nil
 }
 
-func (r *persistentVolumeReconciler) shouldDelete(pv *v1.PersistentVolume) bool {
+func (r *persistentVolumeReconciler) shouldDelete(log logr.Logger, pv *v1.PersistentVolume) bool {
 	if pv.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false
 	}
 
 	if !controllerutil.ContainsFinalizer(pv, r.finalizer) {
+		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Finalizer `%s` is not set", r.finalizer))
 		return false
 	}
 
 	if !(pv.Status.Phase == v1.VolumeReleased || pv.Status.Phase == v1.VolumeAvailable) {
+		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Phase is %s", pv.Status.Phase))
 		return false
 	}
 
 	if pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
+		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Reclaim policy is %s", pv.Spec.PersistentVolumeReclaimPolicy))
 		return false
 	}
 

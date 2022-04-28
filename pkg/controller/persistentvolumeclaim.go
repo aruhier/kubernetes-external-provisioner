@@ -67,15 +67,21 @@ func registerPersistentVolumeClaimReconciler(mgr ctrl.Manager, provisioner Provi
 
 func (r *persistentVolumeClaimReconciler) filterPersistentVolumeClaim() predicate.Predicate {
 	filter := func(claim *v1.PersistentVolumeClaim) bool {
+		log := r.log.WithValues("persistentvolumeclaim", fmt.Sprintf("%s/%s", claim.Namespace, claim.Name))
+
 		provisioner, found := claim.Annotations["volume.kubernetes.io/storage-provisioner"]
 		if !found {
+			log.V(loglevel.Debug).Info("Couldn’t find `volume.kubernetes.io/storage-provisioner` annotation, falling back to `volume.beta.kubernetes.io/storage-provisioner`")
+
 			provisioner, found = claim.Annotations["volume.beta.kubernetes.io/storage-provisioner"]
 			if !found {
+				log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Couldn’t find `volume.kubernetes.io/storage-provisioner` nor `volume.beta.kubernetes.io/storage-provisioner` annotations")
 				return false
 			}
 		}
 
 		if provisioner != r.provisioner.Name() {
+			log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Provisionner name doesn’t match")
 			return false
 		}
 
@@ -119,18 +125,19 @@ func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if !claim.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.V(loglevel.Info).Info("Nothing to do (deletion in progress)")
 		return ctrl.Result{}, nil
 	}
 
-	if shouldProvision, err := r.shouldProvision(ctx, claim); err != nil {
-		r.log.Error(err, "Unexpected error while validating PersistentVolumeClaim")
+	if shouldProvision, err := r.shouldProvision(ctx, log, claim); err != nil {
+		log.Error(err, "Unexpected error while validating PersistentVolumeClaim")
 		return ctrl.Result{}, err
 	} else if shouldProvision {
 		return r.provision(ctx, claim)
 	}
 
 	if shouldResize, err := r.shouldResize(ctx, claim); err != nil {
-		r.log.Error(err, "Unexpected error while validating PersistentVolumeClaim")
+		log.Error(err, "Unexpected error while validating PersistentVolumeClaim")
 		return ctrl.Result{}, err
 	} else if shouldResize {
 		return r.resize(ctx, claim)
@@ -140,8 +147,9 @@ func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Minute}, nil
 }
 
-func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
+func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, log logr.Logger, claim *v1.PersistentVolumeClaim) (bool, error) {
 	if claim.Spec.VolumeName != "" {
+		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", ".spec.volumeName is not set (should be set automatically by Kubernetes)")
 		return false, nil
 	}
 
@@ -151,11 +159,12 @@ func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, c
 	}
 
 	if class == nil {
+		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", "Couldn’t find StorageClass")
 		return false, nil
 	}
 
 	if class.VolumeBindingMode != nil && *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		r.log.V(loglevel.Warn).Info("StorageClasses with `volumeBindingMode: WaitForFirstConsumer` are not supported yet")
+		log.V(loglevel.Warn).Info("Skipping provisioning", "reason", "StorageClasses with `volumeBindingMode: WaitForFirstConsumer` are not yet supported")
 		return false, nil
 	}
 
