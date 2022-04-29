@@ -225,6 +225,11 @@ func (r *persistentVolumeClaimReconciler) provision(ctx context.Context, claim *
 }
 
 func (r *persistentVolumeClaimReconciler) shouldResize(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
+	// If PVC is not bound to a PV, there’s nothing to resize
+	if claim.Status.Phase != v1.ClaimBound {
+		return false, nil
+	}
+
 	if resizer, ok := r.provisioner.(Resizer); !ok || resizer == nil {
 		return false, nil
 	}
