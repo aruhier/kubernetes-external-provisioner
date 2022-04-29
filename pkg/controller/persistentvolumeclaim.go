@@ -148,8 +148,13 @@ func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, log logr.Logger, claim *v1.PersistentVolumeClaim) (bool, error) {
+	if claim.Status.Phase != v1.ClaimPending {
+		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", "PVC is already bound")
+		return false, nil
+	}
+
 	if claim.Spec.VolumeName != "" {
-		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", ".spec.volumeName is not set (should be set automatically by Kubernetes)")
+		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", ".spec.volumeName is set (probably because the PVC is already bound to a PV)")
 		return false, nil
 	}
 
