@@ -299,7 +299,7 @@ func (r *persistentVolumeClaimReconciler) getStorageClass(ctx context.Context, c
 func (r *persistentVolumeClaimReconciler) getPersistentVolumeFromClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	pv := &v1.PersistentVolume{}
 	if err := r.reader.Get(ctx, client.ObjectKey{Name: claim.Spec.VolumeName}, pv); err != nil {
-		return nil, fmt.Errorf("Unable to fetch PersistentVolume: %s", err)
+		return nil, err
 	}
 
 	return pv, nil
