@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	"gitlab.com/Arcaik/external-provisioner/internal/loglevel"
 )
 
 type persistentVolumeClaimReconciler struct {
@@ -54,7 +52,7 @@ func registerPersistentVolumeClaimReconciler(mgr ctrl.Manager, provisioner Provi
 		scheme:      mgr.GetScheme(),
 		reader:      mgr.GetAPIReader(),
 		recorder:    mgr.GetEventRecorderFor(provisioner.Name()),
-		log:         ctrl.Log.WithName("controller").WithName("persistentvolumeclaim"),
+		log:         ctrl.Log.WithName("persistentvolumeclaim"),
 		provisioner: provisioner,
 		finalizer:   finalizer,
 	}
@@ -71,17 +69,17 @@ func (r *persistentVolumeClaimReconciler) filterPersistentVolumeClaim() predicat
 
 		provisioner, found := claim.Annotations["volume.kubernetes.io/storage-provisioner"]
 		if !found {
-			log.V(loglevel.Debug).Info("Couldn’t find `volume.kubernetes.io/storage-provisioner` annotation, falling back to `volume.beta.kubernetes.io/storage-provisioner`")
+			log.V(1).Info("Couldn’t find `volume.kubernetes.io/storage-provisioner` annotation, falling back to `volume.beta.kubernetes.io/storage-provisioner`")
 
 			provisioner, found = claim.Annotations["volume.beta.kubernetes.io/storage-provisioner"]
 			if !found {
-				log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Couldn’t find `volume.kubernetes.io/storage-provisioner` nor `volume.beta.kubernetes.io/storage-provisioner` annotations")
+				log.V(1).Info("Skipping reconcilation", "reason", "Couldn’t find `volume.kubernetes.io/storage-provisioner` nor `volume.beta.kubernetes.io/storage-provisioner` annotations")
 				return false
 			}
 		}
 
 		if provisioner != r.provisioner.Name() {
-			log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Provisionner name doesn’t match")
+			log.V(1).Info("Skipping reconcilation", "reason", "Provisionner name doesn’t match")
 			return false
 		}
 
@@ -112,7 +110,7 @@ func (r *persistentVolumeClaimReconciler) filterPersistentVolumeClaim() predicat
 
 func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("persistentvolumeclaim", req.NamespacedName.String())
-	log.V(loglevel.Debug).Info("Starting reconciliation")
+	log.Info("Starting reconciliation")
 
 	claim := &v1.PersistentVolumeClaim{}
 	if err := r.reader.Get(ctx, req.NamespacedName, claim); err != nil {
@@ -125,7 +123,7 @@ func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if !claim.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.V(loglevel.Info).Info("Nothing to do (deletion in progress)")
+		log.Info("Nothing to do (deletion in progress)")
 		return ctrl.Result{}, nil
 	}
 
@@ -143,18 +141,18 @@ func (r *persistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return r.resize(ctx, claim)
 	}
 
-	log.V(loglevel.Info).Info("Nothing to do")
+	log.Info("Nothing to do")
 	return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Minute}, nil
 }
 
 func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, log logr.Logger, claim *v1.PersistentVolumeClaim) (bool, error) {
 	if claim.Status.Phase != v1.ClaimPending {
-		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", "PVC is already bound")
+		log.V(1).Info("Skipping provisioning", "reason", "PVC is already bound")
 		return false, nil
 	}
 
 	if claim.Spec.VolumeName != "" {
-		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", ".spec.volumeName is set (probably because the PVC is already bound to a PV)")
+		log.V(1).Info("Skipping provisioning", "reason", ".spec.volumeName is set (probably because the PVC is already bound to a PV)")
 		return false, nil
 	}
 
@@ -164,12 +162,12 @@ func (r *persistentVolumeClaimReconciler) shouldProvision(ctx context.Context, l
 	}
 
 	if class == nil {
-		log.V(loglevel.Debug).Info("Skipping provisioning", "reason", "Couldn’t find StorageClass")
+		log.V(1).Info("Skipping provisioning", "reason", "Couldn’t find StorageClass")
 		return false, nil
 	}
 
 	if class.VolumeBindingMode != nil && *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		log.V(loglevel.Warn).Info("Skipping provisioning", "reason", "StorageClasses with `volumeBindingMode: WaitForFirstConsumer` are not yet supported")
+		log.Info("Skipping provisioning", "reason", "StorageClasses with `volumeBindingMode: WaitForFirstConsumer` are not yet supported")
 		return false, nil
 	}
 

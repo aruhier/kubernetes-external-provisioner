@@ -24,19 +24,20 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrllogzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"gitlab.com/Arcaik/external-provisioner/internal/loglevel"
 	"gitlab.com/Arcaik/external-provisioner/pkg/version"
 )
 
 type options struct {
-	logLevel                loglevel.Flag
+	logLevel                int8
 	leaderElect             bool
 	leaderElectionNamespace string
 	leaseDuration           time.Duration
@@ -82,7 +83,8 @@ func InitFlags(cmd *cobra.Command) error {
 
 	cmd.SetVersionTemplate(version.Template())
 
-	cmd.PersistentFlags().VarP(&o.logLevel, "v", "v", "Number for the log verbosity level (default 0).")
+	cmd.PersistentFlags().Int8VarP(&o.logLevel, "v", "v", 0, ""+
+		"Number for the log verbosity level (default 0).")
 	cmd.PersistentFlags().BoolVar(&o.leaderElect, "leader-elect", defaultLeaderElect, ""+
 		"If true, the controller will perform leader election to ensure no more than one instance "+
 		"operates at a time")
@@ -117,7 +119,9 @@ type ProvisionController struct {
 
 // NewProvisionController creates a new provision controller with the given Provisioner.
 func NewProvisioningController(p Provisioner) (*ProvisionController, error) {
-	logger := zap.New(zap.UseDevMode(false), zap.JSONEncoder(), zap.Level(o.logLevel.AtomicLevel())).
+	logLevel := zap.NewAtomicLevelAt(zapcore.Level(-1 * o.logLevel))
+
+	logger := ctrllogzap.New(ctrllogzap.UseDevMode(false), ctrllogzap.JSONEncoder(), ctrllogzap.Level(logLevel)).
 		WithName("external-provisioner").
 		WithName(p.Name())
 

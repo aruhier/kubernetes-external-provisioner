@@ -31,8 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	"gitlab.com/Arcaik/external-provisioner/internal/loglevel"
 )
 
 type persistentVolumeReconciler struct {
@@ -49,7 +47,7 @@ func registerPersistentVolumeReconciler(mgr ctrl.Manager, provisioner Provisione
 		Client:      mgr.GetClient(),
 		reader:      mgr.GetAPIReader(),
 		recorder:    mgr.GetEventRecorderFor(provisioner.Name()),
-		log:         ctrl.Log.WithName("controller").WithName("persistentvolume"),
+		log:         ctrl.Log.WithName("persistentvolume"),
 		provisioner: provisioner,
 		finalizer:   finalizer,
 	}
@@ -66,12 +64,12 @@ func (r *persistentVolumeReconciler) filterPersistentVolume() predicate.Predicat
 
 		provisionedBy, found := pv.Annotations["pv.kubernetes.io/provisioned-by"]
 		if !found {
-			log.V(loglevel.Debug).Info("Skipping reconcilation", "reason", "Couldn’t find `pv.kubernetes.io/provisioned-by` annotation")
+			log.V(1).Info("Skipping reconcilation", "reason", "Couldn’t find `pv.kubernetes.io/provisioned-by` annotation")
 			return false
 		}
 
 		if provisionedBy != r.provisioner.Name() {
-			log.V(loglevel.Debug).Info("Skipping reconciliation", "reason", "Provisionner name doesn’t match")
+			log.V(1).Info("Skipping reconciliation", "reason", "Provisionner name doesn’t match")
 			return false
 		}
 
@@ -102,7 +100,7 @@ func (r *persistentVolumeReconciler) filterPersistentVolume() predicate.Predicat
 
 func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("persistentvolume", req.NamespacedName.Name)
-	log.V(loglevel.Debug).Info("Starting reconciliation")
+	log.Info("Starting reconciliation")
 
 	pv := &v1.PersistentVolume{}
 	if err := r.reader.Get(ctx, req.NamespacedName, pv); err != nil {
@@ -126,23 +124,23 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	log.V(loglevel.Debug).Info("Nothing to do")
+	log.Info("Nothing to do")
 	return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Minute}, nil
 }
 
 func (r *persistentVolumeReconciler) shouldDelete(log logr.Logger, pv *v1.PersistentVolume) bool {
 	if !controllerutil.ContainsFinalizer(pv, r.finalizer) {
-		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Finalizer `%s` is not set", r.finalizer))
+		log.V(1).Info("Skipping deletion", "reason", fmt.Sprintf("Finalizer `%s` is not set", r.finalizer))
 		return false
 	}
 
 	if !(pv.Status.Phase == v1.VolumeReleased || pv.Status.Phase == v1.VolumeAvailable) {
-		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Phase is %s", pv.Status.Phase))
+		log.V(1).Info("Skipping deletion", "reason", fmt.Sprintf("Phase is %s", pv.Status.Phase))
 		return false
 	}
 
 	if pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
-		log.V(loglevel.Debug).Info("Skipping deletion", "reason", fmt.Sprintf("Reclaim policy is %s", pv.Spec.PersistentVolumeReclaimPolicy))
+		log.V(1).Info("Skipping deletion", "reason", fmt.Sprintf("Reclaim policy is %s", pv.Spec.PersistentVolumeReclaimPolicy))
 		return false
 	}
 
