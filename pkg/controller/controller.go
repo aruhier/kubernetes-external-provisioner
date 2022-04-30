@@ -24,15 +24,13 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	ctrllogzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"gitlab.com/Arcaik/external-provisioner/internal/log"
 	"gitlab.com/Arcaik/external-provisioner/pkg/version"
 )
 
@@ -119,12 +117,7 @@ type ProvisionController struct {
 
 // NewProvisionController creates a new provision controller with the given Provisioner.
 func NewProvisioningController(p Provisioner) (*ProvisionController, error) {
-	logLevel := zap.NewAtomicLevelAt(zapcore.Level(-1 * o.logLevel))
-
-	logger := ctrllogzap.New(ctrllogzap.UseDevMode(false), ctrllogzap.JSONEncoder(), ctrllogzap.Level(logLevel)).
-		WithName("external-provisioner").
-		WithName(p.Name())
-
+	logger := log.New(o.logLevel).WithName("external-provisioner").WithName(p.Name())
 	ctrl.SetLogger(logger)
 
 	config, err := ctrl.GetConfig()
