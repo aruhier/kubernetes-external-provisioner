@@ -20,7 +20,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -120,12 +119,10 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if err := r.removeFinalizer(ctx, pv); err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
-
-		return ctrl.Result{}, nil
 	}
 
 	log.Info("Nothing to do")
-	return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Minute}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *persistentVolumeReconciler) shouldDelete(log logr.Logger, pv *v1.PersistentVolume) bool {
