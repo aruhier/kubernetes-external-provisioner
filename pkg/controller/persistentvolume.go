@@ -112,13 +112,13 @@ func (r *persistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if !pv.ObjectMeta.DeletionTimestamp.IsZero() {
-		if r.shouldDelete(log, pv) {
-			return r.delete(ctx, pv)
-		}
-
 		if err := r.removeFinalizer(ctx, pv); err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
+	}
+
+	if r.shouldDelete(log, pv) {
+		return r.delete(ctx, log, pv)
 	}
 
 	log.Info("Nothing to do")
@@ -144,7 +144,7 @@ func (r *persistentVolumeReconciler) shouldDelete(log logr.Logger, pv *v1.Persis
 	return true
 }
 
-func (r *persistentVolumeReconciler) delete(ctx context.Context, pv *v1.PersistentVolume) (ctrl.Result, error) {
+func (r *persistentVolumeReconciler) delete(ctx context.Context, log logr.Logger, pv *v1.PersistentVolume) (ctrl.Result, error) {
 	r.recorder.Event(pv, v1.EventTypeNormal, "DeletionStarted", "Deletion started")
 
 	if err := r.provisioner.Delete(pv); err != nil {
@@ -153,10 +153,16 @@ func (r *persistentVolumeReconciler) delete(ctx context.Context, pv *v1.Persiste
 		return ctrl.Result{Requeue: true}, e
 	}
 
-	if err := r.removeFinalizer(ctx, pv); err != nil {
-		return ctrl.Result{Requeue: true}, err
+	if err := r.Delete(ctx, pv); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
+		log.Error(err, "Unable to delete PersistentVolume")
+		return ctrl.Result{}, err
 	}
 
+	log.V(1).Info("Volume deleted")
 	return ctrl.Result{}, nil
 }
 
