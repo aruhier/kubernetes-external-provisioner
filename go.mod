@@ -1,6 +1,6 @@
 module gitlab.com/Arcaik/external-provisioner
 
-go 1.19
+go 1.20
 
 require (
 	github.com/go-logr/logr v1.2.3
