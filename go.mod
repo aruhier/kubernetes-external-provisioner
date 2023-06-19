@@ -3,7 +3,7 @@ module gitlab.com/Arcaik/external-provisioner
 go 1.20
 
 require (
-	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/logr v1.2.4
 	github.com/spf13/cobra v1.6.1
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.26.1
