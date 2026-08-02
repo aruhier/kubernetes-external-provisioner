@@ -29,9 +29,10 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"gitlab.com/Arcaik/external-provisioner/internal/log"
-	"gitlab.com/Arcaik/external-provisioner/pkg/version"
+	"github.com/aruhier/kubernetes-external-provisioner/internal/log"
+	"github.com/aruhier/kubernetes-external-provisioner/pkg/version"
 )
 
 type options struct {
@@ -135,7 +136,9 @@ func NewProvisioningController(p Provisioner) (*ProvisionController, error) {
 		RenewDeadline:                 &o.renewDeadline,
 		RetryPeriod:                   &o.retryPeriod,
 		HealthProbeBindAddress:        o.healthProbeBindAddress,
-		MetricsBindAddress:            o.metricsBindAddress,
+		Metrics: metricsserver.Options{
+			BindAddress: o.metricsBindAddress,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to start manager: %s", err)
