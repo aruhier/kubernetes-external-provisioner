@@ -2,7 +2,7 @@ module gitlab.com/Arcaik/external-provisioner
 
 go 1.21
 
-toolchain go1.21.4
+toolchain go1.26.5
 
 require (
 	github.com/go-logr/logr v1.4.4
