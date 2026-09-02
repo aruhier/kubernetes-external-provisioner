@@ -2,7 +2,7 @@ module github.com/aruhier/kubernetes-external-provisioner
 
 go 1.26.0
 
-toolchain go1.27.0
+toolchain go1.27.1
 
 require (
 	github.com/go-logr/logr v1.4.4
